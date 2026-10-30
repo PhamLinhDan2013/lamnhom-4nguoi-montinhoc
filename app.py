@@ -1,218 +1,247 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Cấu hình trang web Streamlit tối giản nhất có thể
-st.set_page_config(page_title="Dino Chrome Game Pro Max", page_icon="🦖", layout="centered")
+# Cấu hình trang Streamlit
+st.set_page_config(
+    page_title="Streamlit Dino Pixel Game",
+    page_icon="🦖",
+    layout="centered"
+)
 
-# Đoạn mã game HTML5 Canvas to hơn + Hiệu ứng Đổi màu + Âm thanh khi nhảy
-dino_game_html = """
+st.title("🦖 Đập Hộp Game Khủng Long Trên Streamlit")
+st.caption("Phiên bản custom Pixel-Art đầy đủ Kho Nhân Vật, Tóc, Áo và Quần!")
+
+# Toàn bộ mã nguồn HTML + CSS + JS của Game Khủng Long Custom
+game_html = """
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <style>
-        body { margin: 0; display: flex; justify-content: center; align-items: center; background-color: #f7f7f7; font-family: Arial, sans-serif; overflow: hidden; user-select: none; }
-        canvas { background-color: #fff; border: 3px solid #333; border-radius: 12px; box-shadow: 0px 6px 20px rgba(0,0,0,0.15); }
+        body {
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+        }
+        #game-container {
+            position: relative;
+            margin-top: 5px;
+        }
+        canvas {
+            background: #fff;
+            border-bottom: 2px solid #535353;
+        }
+        #custom-panel {
+            width: 100%;
+            max-width: 740px;
+            background: #f7f7f7;
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            box-sizing: border-box;
+        }
+        .section {
+            flex: 1;
+            min-width: 200px;
+            margin: 5px 10px;
+        }
+        .section-title {
+            font-weight: bold;
+            color: #333;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+        .btn-opt {
+            padding: 8px 2px;
+            font-size: 11px;
+            border: 2px solid #ccc;
+            background: #fff;
+            cursor: pointer;
+            text-align: center;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+        .btn-opt.active {
+            border-color: #535353;
+            background: #535353;
+            color: #fff;
+        }
+        .btn-opt:hover:not(.active) {
+            background: #eee;
+        }
+        #instructions {
+            margin-top: 8px;
+            color: #777;
+            font-size: 12px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-    <!-- Phóng to kích thước Canvas lên 800x400 -->
-    <canvas id="gameCanvas" width="800" height="400"></canvas>
 
-    <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
+    <div id="game-container">
+        <canvas id="gameCanvas" width="750" height="220"></canvas>
+    </div>
 
-        let gameSpeed = 6;
-        let score = 0;
-        let highScore = 0;
-        let isGameOver = false;
-        
-        // Mảng chứa các màu sắc ngẫu nhiên cho Khủng long
-        const colors = ["#535353", "#ff3333", "#33cc33", "#3333ff", "#ff9900", "#cc33ff", "#00ffff", "#ff3399"];
-        let currentDinoColor = colors[0];
+    <div id="instructions">Bấm <b>Phím Cách (Spacebar)</b> hoặc chạm màn hình Game để Nhảy / Chơi lại</div>
 
-        // Khởi tạo Khủng long (Điều chỉnh lại tọa độ theo khung màn hình 400px)
-        const dino = {
-            x: 80,
-            y: 330,
-            width: 40,
-            height: 50,
-            gravity: 0.6,
-            jumpForce: -13,
-            velocity: 0,
-            isJumping: false
-        };
+    <div id="custom-panel">
+        <!-- 1. Chọn nhân vật -->
+        <div class="section">
+            <div class="section-title">🦖 CHỌN NHÂN VẬT</div>
+            <div class="options-grid" style="grid-template-columns: repeat(2, 1fr);">
+                <button class="btn-opt active" onclick="setSkin('pink')">Khủng Long Hồng</button>
+                <button class="btn-opt" onclick="setSkin('red')">Khủng Long Đỏ</button>
+                <button class="btn-opt" onclick="setSkin('black')">Khủng Long Đen</button>
+                <button class="btn-opt" onclick="setSkin('rainbow')">Cầu Vồng 🌈</button>
+                <button class="btn-opt" onclick="setSkin('blue')">Khủng Long Xanh</button>
+                <button class="btn-opt" onclick="setSkin('human')">👨 Con Người</button>
+            </div>
+        </div>
 
-        let obstacles = [];
-        let spawnTimer = 0;
+        <!-- 2. Chọn Tóc -->
+        <div class="section">
+            <div class="section-title">💇 KIỂU TÓC</div>
+            <div class="options-grid">
+                <button id="hair-0" class="btn-opt active" onclick="setHair(0)">Trọc</button>
+                <button id="hair-1" class="btn-opt" onclick="setHair(1)">Tóc Ngầu</button>
+                <button id="hair-2" class="btn-opt" onclick="setHair(2)">Quý Tộc</button>
+            </div>
+        </div>
 
-        // Hàm tự tạo âm thanh kỹ thuật số phát qua loa máy tính khi nhảy
-        function playJumpSound() {
-            try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(150, audioCtx.currentTime); // Tần số âm thanh lúc bắt đầu nhảy
-                oscillator.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.12); // Âm thanh vút lên cao
-                
-                gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
-                
-                oscillator.start();
-                oscillator.stop(audioCtx.currentTime + 0.12);
-            } catch (e) {
-                console.log("Trình duyệt chặn âm thanh tự động");
-            }
-        }
+        <!-- 3. Chọn Áo & Quần -->
+        <div class="section">
+            <div class="section-title">👕 TRANG PHỤC</div>
+            <div style="font-size: 11px; margin-bottom: 2px;">Chọn Áo:</div>
+            <div class="options-grid" style="margin-bottom: 8px;">
+                <button id="shirt-0" class="btn-opt active" onclick="setShirt(0)">Không</button>
+                <button id="shirt-1" class="btn-opt" onclick="setShirt(1)">Siêu Nhân</button>
+                <button id="shirt-2" class="btn-opt" onclick="setShirt(2)">Hoàng Gia</button>
+            </div>
+            <div style="font-size: 11px; margin-bottom: 2px;">Chọn Quần:</div>
+            <div class="options-grid">
+                <button id="pant-0" class="btn-opt active" onclick="setPant(0)">Không</button>
+                <button id="pant-1" class="btn-opt" onclick="setPant(1)">Quần Jean</button>
+                <button id="pant-2" class="btn-opt" onclick="setPant(2)">Quần Lửa</button>
+            </div>
+        </div>
+    </div>
 
-        function jump() {
-            if (isGameOver) {
-                resetGame();
-                return;
-            }
-            if (!dino.isJumping) {
-                dino.velocity = dino.jumpForce;
-                dino.isJumping = true;
-                playJumpSound(); // Phát âm thanh "Típ" khi nhảy
-            }
-        }
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
 
-        window.addEventListener("keydown", function(e) {
-            if (e.code === "Space") {
-                e.preventDefault();
-                jump();
-            }
-        });
+let currentSkin = 'pink';
+let currentHair = 0;   
+let currentShirt = 0;  
+let currentPant = 0;   
 
-        canvas.addEventListener("click", jump);
+const skinColors = {
+    pink: '#ff8da1', red: '#ff3b30', black: '#2c2c2e', blue: '#007aff', human: '#ffcc99'
+};
 
-        function spawnObstacle() {
-            let height = Math.random() > 0.5 ? 65 : 45;
-            let width = 22;
-            obstacles.push({
-                x: canvas.width,
-                y: 380 - height,
-                width: width,
-                height: height
-            });
-        }
+// Đồ họa ma trận Pixel gốc rút gọn tối ưu
+const DINO_PIXEL = [,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+    [0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0]
+];
 
-        function resetGame() {
-            obstacles = [];
-            score = 0;
-            gameSpeed = 6;
-            isGameOver = false;
-            currentDinoColor = colors[0];
-            dino.y = 330;
-            dino.velocity = 0;
-            dino.isJumping = false;
-            animate();
-        }
+const HUMAN_PIXEL = [,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+ ,
+    [0,0,0,0,1,1,0,0,1,1,0,0,0,0]
+];
 
-        let animationFrameId;
-        function animate() {
-            if (isGameOver) return;
+function getPixelOverlay(row, col, baseMatrix) {
+    if (currentHair === 1) { 
+        if (baseMatrix === DINO_PIXEL && row === 0 && col >= 11 && col <= 15) return '#ff9500';
+        if (baseMatrix === HUMAN_PIXEL && row === 0 && col >= 5 && col <= 9) return '#ff9500';
+    } else if (currentHair === 2) { 
+        if (baseMatrix === DINO_PIXEL && row === 0 && col >= 11 && col <= 17) return '#af52de';
+        if (baseMatrix === HUMAN_PIXEL && row === 0 && col >= 5 && col <= 10) return '#af52de';
+    }
+    if (currentShirt === 1) { 
+        if (baseMatrix === DINO_PIXEL && row >= 5 && row <= 8 && col >= 6 && col <= 11) return '#e74c3c';
+        if (baseMatrix === HUMAN_PIXEL && row >= 4 && row <= 8 && col >= 5 && col <= 9) return '#e74c3c';
+    } else if (currentShirt === 2) { 
+        if (baseMatrix === DINO_PIXEL && row >= 5 && row <= 8 && col >= 6 && col <= 11) return '#ffcc00';
+        if (baseMatrix === HUMAN_PIXEL && row >= 4 && row <= 8 && col >= 5 && col <= 9) return '#ffcc00';
+    }
+    if (currentPant === 1) { 
+        if (baseMatrix === DINO_PIXEL && row >= 9 && row <= 11 && col >= 4 && col <= 9) return '#2f80ed';
+        if (baseMatrix === HUMAN_PIXEL && row >= 9 && row <= 11 && col >= 5 && col <= 9) return '#2f80ed';
+    } else if (currentPant === 2) { 
+        if (baseMatrix === DINO_PIXEL && row >= 9 && row <= 11 && col >= 4 && col <= 9) return '#ff453a';
+        if (baseMatrix === HUMAN_PIXEL && row >= 9 && row <= 11 && col >= 5 && col <= 9) return '#ff453a';
+    }
+    return null;
+}
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+let gameSpeed = 6.5; let score = 0; let highScore = 0;
+let isGameOver = false; let gameStarted = false;
+let obstacles = []; let clouds = []; let gameFrame = 0;
 
-            // Vẽ mặt đất gạch chân cố định dưới chân khủng long
-            ctx.strokeStyle = "#535353";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(0, 380);
-            ctx.lineTo(canvas.width, 380);
-            ctx.stroke();
-
-            // Áp dụng trọng lực cho Khủng long
-            dino.velocity += dino.gravity;
-            dino.y += dino.velocity;
-
-            if (dino.y >= 330) {
-                dino.y = 330;
-                dino.velocity = 0;
-                dino.isJumping = false;
-            }
-
-            // Vẽ Khủng long (Dạng Emoji to hơn kèm theo màu nền đổi màu sinh động)
-            ctx.save();
-            ctx.font = "42px Arial";
-            // Tạo hiệu ứng đổ bóng màu để con khủng long đổi màu liên tục xung quanh
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = currentDinoColor;
-            ctx.fillStyle = currentDinoColor;
-            ctx.fillText("🦖", dino.x, dino.y + 38);
-            ctx.restore();
-
-            // Quản lý vật cản Xương rồng lao tới
-            spawnTimer++;
-            if (spawnTimer > Math.max(45, 95 - gameSpeed * 3)) {
-                spawnObstacle();
-                spawnTimer = 0;
-            }
-
-            for (let i = obstacles.length - 1; i >= 0; i--) {
-                let o = obstacles[i];
-                o.x -= gameSpeed;
-
-                // Vẽ Xương rồng to rõ ràng hơn
-                ctx.font = "38px Arial";
-                ctx.fillText("🌵", o.x, o.y + 35);
-
-                // Kiểm tra va chạm (Đâm vào xương rồng)
-                if (
-                    dino.x < o.x + o.width &&
-                    dino.x + dino.width > o.x &&
-                    dino.y < o.y + o.height &&
-                    dino.y + dino.height > o.y
-                ) {
-                    isGameOver = true;
+const dino = {
+    x: 60, y: 160, width: 44, height: 44, vy: 0, gravity: 0.6, jumpForce: -11.5, isGrounded: true, legFrame: 0,
+    update: function() {
+        this.vy += this.gravity; this.y += this.vy;
+        if (this.y >= 160) { this.y = 160; this.vy = 0; this.isGrounded = true; } else { this.isGrounded = false; }
+        if (gameStarted && !isGameOver && gameFrame % 8 === 0) { this.legFrame = this.legFrame === 0 ? 1 : 0; }
+    },
+    draw: function() {
+        const matrix = currentSkin === 'human' ? HUMAN_PIXEL : DINO_PIXEL;
+        const pixelSize = 2.8;
+        for (let r = 0; r < matrix.length; r++) {
+            for (let c = 0; c < matrix[r].length; c++) {
+                let cell = matrix[r][c];
+                if (this.isGrounded && currentSkin !== 'human') {
+                    if (this.legFrame === 0 && r >= 13 && c === 5) continue;
+                    if (this.legFrame === 1 && r >= 13 && c === 7) continue;
                 }
-
-                // Khi vượt qua xương rồng thành công: Cộng điểm + Đổi màu khủng long
-                if (o.x + o.width < 0) {
-                    obstacles.splice(i, 1);
-                    score++;
-                    
-                    // Thực hiện đổi màu ngẫu nhiên từ mảng màu có sẵn
-                    let randomColorIndex = Math.floor(Math.random() * colors.length);
-                    currentDinoColor = colors[randomColorIndex];
-                    
-                    if (score > highScore) highScore = score;
-                    if (score % 4 === 0) gameSpeed += 0.5; // Tăng dần tốc độ
-                }
-            }
-
-            // Hiển thị bảng điểm chữ lớn rõ ràng
-            ctx.fillStyle = "#535353";
-            ctx.font = "bold 20px monospace";
-            ctx.fillText("HI " + String(highScore).padStart(5, '0') + "   " + String(score).padStart(5, '0'), 600, 45);
-
-            // Giao diện Game Over khi thua cuộc
-            if (isGameOver) {
-                ctx.fillStyle = "#333";
-                ctx.font = "bold 32px monospace";
-                ctx.fillText("G A M E   O V E R", 260, 180);
-                ctx.font = "18px Arial";
-                ctx.fillText("💀 Bấm chuột hoặc nút Cách để chơi lại", 245, 230);
-                cancelAnimationFrame(animationFrameId);
-                return;
-            }
-
-            animationFrameId = requestAnimationFrame(animate);
-        }
-
-        // Bắt đầu chạy game
-        animate();
-    </script>
-</body>
-</html>
-"""
-
-# Tăng kích thước nhúng chiều rộng và chiều cao lên để chứa vừa khít Canvas 800x400
-components.html(dino_game_html, width=820, height=430, scrolling=False)
+                if (cell > 0 || getPixelOverlay(r, c, matrix) !== null) {
+                    let color = '#000'; const overlay = getPixelOverlay(r, c, matrix);
+                    if (overlay) { color = overlay; } 
+                    else if (cell === 2) { color = '#ffffff'; } 
+                    else if (cell === 1) {
+                        color = currentSkin === 'rainbow' ? `hsl(${(gameFrame * 3 + r * 15) % 360}, 90%, 65%)` : skinColors[currentSkin];
+                    }
+                    ctx.fillStyle = color;
+                    ctx.fillRect(this.x + (c * pixelSize), this.y + (r * pixelSize), pixelSize + 0.2, pixelSize + 0.2);
