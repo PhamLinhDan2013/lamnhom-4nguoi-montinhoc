@@ -1,247 +1,208 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import time
+import random
 
 # Cấu hình trang Streamlit
-st.set_page_config(
-    page_title="Streamlit Dino Pixel Game",
-    page_icon="🦖",
-    layout="centered"
-)
+st.set_page_config(page_title="Pixel Dino Adventure", page_icon="🦖", layout="centered")
 
-st.title("🦖 Đập Hộp Game Khủng Long Trên Streamlit")
-st.caption("Phiên bản custom Pixel-Art đầy đủ Kho Nhân Vật, Tóc, Áo và Quần!")
+# Khởi tạo trạng thái game (Session State)
+if 'score' not in st.session_state:
+    st.session_state.score = 0
+    st.session_state.game_over = False
+    st.session_state.dino_y = 0        # Độ cao của khủng long (0: mặt đất)
+    st.session_state.is_jumping = False
+    st.session_state.is_flying = False # Trạng thái bay bằng jetpack
+    st.session_state.fly_start_time = 0
+    st.session_state.obstacle_count = 0 # Đếm số chướng ngại vật đã vượt qua
+    st.session_state.map_state = "DESERT" # Bản đồ: DESERT (Xương rồng) hoặc ROAD (Tảng đá)
+    st.session_state.obstacle_x = 100  # Vị trí chướng ngại vật (chạy từ phải 100% sang trái 0%)
+    st.session_state.current_obstacle_type = "CACTUS"
 
-# Toàn bộ mã nguồn HTML + CSS + JS của Game Khủng Long Custom
-game_html = """
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #ffffff;
-            font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            user-select: none;
-        }
-        #game-container {
-            position: relative;
-            margin-top: 5px;
-        }
-        canvas {
-            background: #fff;
-            border-bottom: 2px solid #535353;
-        }
-        #custom-panel {
-            width: 100%;
-            max-width: 740px;
-            background: #f7f7f7;
-            margin-top: 15px;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            box-sizing: border-box;
-        }
-        .section {
-            flex: 1;
-            min-width: 200px;
-            margin: 5px 10px;
-        }
-        .section-title {
-            font-weight: bold;
-            color: #333;
-            border-bottom: 2px solid #ddd;
-            padding-bottom: 5px;
-            margin-bottom: 10px;
-            font-size: 13px;
-        }
-        .options-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-        }
-        .btn-opt {
-            padding: 8px 2px;
-            font-size: 11px;
-            border: 2px solid #ccc;
-            background: #fff;
-            cursor: pointer;
-            text-align: center;
-            border-radius: 4px;
-            font-family: inherit;
-        }
-        .btn-opt.active {
-            border-color: #535353;
-            background: #535353;
-            color: #fff;
-        }
-        .btn-opt:hover:not(.active) {
-            background: #eee;
-        }
-        #instructions {
-            margin-top: 8px;
-            color: #777;
-            font-size: 12px;
-            text-align: center;
-        }
-    </style>
-</head>
-<body>
-
-    <div id="game-container">
-        <canvas id="gameCanvas" width="750" height="220"></canvas>
-    </div>
-
-    <div id="instructions">Bấm <b>Phím Cách (Spacebar)</b> hoặc chạm màn hình Game để Nhảy / Chơi lại</div>
-
-    <div id="custom-panel">
-        <!-- 1. Chọn nhân vật -->
-        <div class="section">
-            <div class="section-title">🦖 CHỌN NHÂN VẬT</div>
-            <div class="options-grid" style="grid-template-columns: repeat(2, 1fr);">
-                <button class="btn-opt active" onclick="setSkin('pink')">Khủng Long Hồng</button>
-                <button class="btn-opt" onclick="setSkin('red')">Khủng Long Đỏ</button>
-                <button class="btn-opt" onclick="setSkin('black')">Khủng Long Đen</button>
-                <button class="btn-opt" onclick="setSkin('rainbow')">Cầu Vồng 🌈</button>
-                <button class="btn-opt" onclick="setSkin('blue')">Khủng Long Xanh</button>
-                <button class="btn-opt" onclick="setSkin('human')">👨 Con Người</button>
-            </div>
-        </div>
-
-        <!-- 2. Chọn Tóc -->
-        <div class="section">
-            <div class="section-title">💇 KIỂU TÓC</div>
-            <div class="options-grid">
-                <button id="hair-0" class="btn-opt active" onclick="setHair(0)">Trọc</button>
-                <button id="hair-1" class="btn-opt" onclick="setHair(1)">Tóc Ngầu</button>
-                <button id="hair-2" class="btn-opt" onclick="setHair(2)">Quý Tộc</button>
-            </div>
-        </div>
-
-        <!-- 3. Chọn Áo & Quần -->
-        <div class="section">
-            <div class="section-title">👕 TRANG PHỤC</div>
-            <div style="font-size: 11px; margin-bottom: 2px;">Chọn Áo:</div>
-            <div class="options-grid" style="margin-bottom: 8px;">
-                <button id="shirt-0" class="btn-opt active" onclick="setShirt(0)">Không</button>
-                <button id="shirt-1" class="btn-opt" onclick="setShirt(1)">Siêu Nhân</button>
-                <button id="shirt-2" class="btn-opt" onclick="setShirt(2)">Hoàng Gia</button>
-            </div>
-            <div style="font-size: 11px; margin-bottom: 2px;">Chọn Quần:</div>
-            <div class="options-grid">
-                <button id="pant-0" class="btn-opt active" onclick="setPant(0)">Không</button>
-                <button id="pant-1" class="btn-opt" onclick="setPant(1)">Quần Jean</button>
-                <button id="pant-2" class="btn-opt" onclick="setPant(2)">Quần Lửa</button>
-            </div>
-        </div>
-    </div>
-
-<script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-ctx.imageSmoothingEnabled = false;
-
-let currentSkin = 'pink';
-let currentHair = 0;   
-let currentShirt = 0;  
-let currentPant = 0;   
-
-const skinColors = {
-    pink: '#ff8da1', red: '#ff3b30', black: '#2c2c2e', blue: '#007aff', human: '#ffcc99'
-};
-
-// Đồ họa ma trận Pixel gốc rút gọn tối ưu
-const DINO_PIXEL = [,
- ,
- ,
- ,
- ,
- ,
- ,
- ,
- ,
- ,
- ,
- ,
- ,
- ,
-    [0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0]
-];
-
-const HUMAN_PIXEL = [,
- ,
- ,
- ,
- ,
- ,
- ,
- ,
- ,
- ,
- ,
- ,
-    [0,0,0,0,1,1,0,0,1,1,0,0,0,0]
-];
-
-function getPixelOverlay(row, col, baseMatrix) {
-    if (currentHair === 1) { 
-        if (baseMatrix === DINO_PIXEL && row === 0 && col >= 11 && col <= 15) return '#ff9500';
-        if (baseMatrix === HUMAN_PIXEL && row === 0 && col >= 5 && col <= 9) return '#ff9500';
-    } else if (currentHair === 2) { 
-        if (baseMatrix === DINO_PIXEL && row === 0 && col >= 11 && col <= 17) return '#af52de';
-        if (baseMatrix === HUMAN_PIXEL && row === 0 && col >= 5 && col <= 10) return '#af52de';
+# Định nghĩa giao diện đồ họa Pixel Art bằng CSS
+st.markdown("""
+<style>
+    .game-container {
+        width: 100%;
+        height: 250px;
+        background-color: #f7f7f7;
+        border-bottom: 3px solid #535353;
+        position: relative;
+        overflow: hidden;
+        border-radius: 8px;
     }
-    if (currentShirt === 1) { 
-        if (baseMatrix === DINO_PIXEL && row >= 5 && row <= 8 && col >= 6 && col <= 11) return '#e74c3c';
-        if (baseMatrix === HUMAN_PIXEL && row >= 4 && row <= 8 && col >= 5 && col <= 9) return '#e74c3c';
-    } else if (currentShirt === 2) { 
-        if (baseMatrix === DINO_PIXEL && row >= 5 && row <= 8 && col >= 6 && col <= 11) return '#ffcc00';
-        if (baseMatrix === HUMAN_PIXEL && row >= 4 && row <= 8 && col >= 5 && col <= 9) return '#ffcc00';
+    .road-theme {
+        background-color: #9E9E9E !important;
+        border-bottom: 5px dashed #FFF !important;
     }
-    if (currentPant === 1) { 
-        if (baseMatrix === DINO_PIXEL && row >= 9 && row <= 11 && col >= 4 && col <= 9) return '#2f80ed';
-        if (baseMatrix === HUMAN_PIXEL && row >= 9 && row <= 11 && col >= 5 && col <= 9) return '#2f80ed';
-    } else if (currentPant === 2) { 
-        if (baseMatrix === DINO_PIXEL && row >= 9 && row <= 11 && col >= 4 && col <= 9) return '#ff453a';
-        if (baseMatrix === HUMAN_PIXEL && row >= 9 && row <= 11 && col >= 5 && col <= 9) return '#ff453a';
+    /* Chú Khủng Long Pixel Google siêu đẹp */
+    .dino {
+        width: 44px;
+        height: 47px;
+        position: absolute;
+        bottom: 0px;
+        left: 50px;
+        transition: bottom 0.1s ease-out;
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://w3.org" viewBox="0 0 22 24" shape-rendering="crispEdges"><path d="M14 0h6v1h2v2h-2v1h-2v1h-4V4h-2V3h2V2h2V1h-2zm-4 4h4v1h-4zm-2 1h2v1H8zm-1 1h1v1H7zm-1 1h1v1H6zm-1 1h1v6H5zm-1 6h1v4H4zm1 4h1v1H5zm1 1h2v1H6zm5-13h1v1h-1zm1 3h7v1h-7zm0 1h8v1h-8zm0 1h9v1h-9zm0 1h7v1h-7zm0 1h5v1h-5zm0 1h4v1h-4zm0 1h6v1h-6zm0 1h7v1h-7zm1 1h6v1h-6zm1 1h5v1h-5zm1 1h4v1h-4zm-7 1h2v1H8zm1 1h2v1H9zm2 1h2v1h-2zm4-4h1v3h-1zm2 1h1v3h-1z" fill="%23535353"/></svg>');
+        background-size: contain;
+        background-repeat: no-repeat;
     }
-    return null;
-}
+    .jetpack {
+        box-shadow: 0 -8px 0 #FF5722, 0 -16px 0 #FFC107;
+        animation: burn 0.1s infinite alternate;
+    }
+    /* Xương rồng Pixel */
+    .cactus {
+        width: 25px;
+        height: 50px;
+        position: absolute;
+        bottom: 0px;
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://w3.org" viewBox="0 0 10 20" shape-rendering="crispEdges"><path d="M3 0h3v20H3zm-2 4h2v7H1zm6 3h2v6H7z" fill="%23388E3C"/></svg>');
+        background-size: contain;
+        background-repeat: no-repeat;
+    }
+    /* Cây thứ 6 có trang bị bay */
+    .jetpack-cactus {
+        width: 30px;
+        height: 50px;
+        position: absolute;
+        bottom: 0px;
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://w3.org" viewBox="0 0 12 20" shape-rendering="crispEdges"><path d="M2 0h3v20H2zm5 2h3v10H7z" fill="%23388E3C"/><path d="M7 2h4v5H7z" fill="%23FF5722"/></svg>');
+        background-size: contain;
+        background-repeat: no-repeat;
+    }
+    /* Tảng đá Pixel ngoài đường */
+    .rock {
+        width: 35px;
+        height: 30px;
+        position: absolute;
+        bottom: 0px;
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://w3.org" viewBox="0 0 12 10" shape-rendering="crispEdges"><path d="M3 0h6v2h3v5H9v3H0V5h3z" fill="%23616161"/></svg>');
+        background-size: contain;
+        background-repeat: no-repeat;
+    }
+    /* Cổng dịch chuyển mãnh liệt */
+    .portal {
+        width: 40px;
+        height: 70px;
+        position: absolute;
+        bottom: 0px;
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://w3.org" viewBox="0 0 10 20" shape-rendering="crispEdges"><path d="M0 0h10v20H0z" fill="%23E040FB"/></svg>');
+        background-size: contain;
+        background-repeat: no-repeat;
+        box-shadow: 0 0 15px #E040FB;
+        border-radius: 50%;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-let gameSpeed = 6.5; let score = 0; let highScore = 0;
-let isGameOver = false; let gameStarted = false;
-let obstacles = []; let clouds = []; let gameFrame = 0;
+st.title("🦖 Siêu Khủng Long Pixel Phiêu Lưu Ký")
+st.write("Nhấn nút **Nhảy 🦘** để vượt qua các chướng ngại vật theo cốt truyện đặc biệt!")
 
-const dino = {
-    x: 60, y: 160, width: 44, height: 44, vy: 0, gravity: 0.6, jumpForce: -11.5, isGrounded: true, legFrame: 0,
-    update: function() {
-        this.vy += this.gravity; this.y += this.vy;
-        if (this.y >= 160) { this.y = 160; this.vy = 0; this.isGrounded = true; } else { this.isGrounded = false; }
-        if (gameStarted && !isGameOver && gameFrame % 8 === 0) { this.legFrame = this.legFrame === 0 ? 1 : 0; }
-    },
-    draw: function() {
-        const matrix = currentSkin === 'human' ? HUMAN_PIXEL : DINO_PIXEL;
-        const pixelSize = 2.8;
-        for (let r = 0; r < matrix.length; r++) {
-            for (let c = 0; c < matrix[r].length; c++) {
-                let cell = matrix[r][c];
-                if (this.isGrounded && currentSkin !== 'human') {
-                    if (this.legFrame === 0 && r >= 13 && c === 5) continue;
-                    if (this.legFrame === 1 && r >= 13 && c === 7) continue;
-                }
-                if (cell > 0 || getPixelOverlay(r, c, matrix) !== null) {
-                    let color = '#000'; const overlay = getPixelOverlay(r, c, matrix);
-                    if (overlay) { color = overlay; } 
-                    else if (cell === 2) { color = '#ffffff'; } 
-                    else if (cell === 1) {
-                        color = currentSkin === 'rainbow' ? `hsl(${(gameFrame * 3 + r * 15) % 360}, 90%, 65%)` : skinColors[currentSkin];
-                    }
-                    ctx.fillStyle = color;
-                    ctx.fillRect(this.x + (c * pixelSize), this.y + (r * pixelSize), pixelSize + 0.2, pixelSize + 0.2);
+# Cơ chế điều khiển hành động
+def trigger_jump():
+    if not st.session_state.game_over and not st.session_state.is_jumping and not st.session_state.is_flying:
+        st.session_state.is_jumping = True
+        st.session_state.dino_y = 90  # Nhảy lên cao
+
+def reset_game():
+    st.session_state.score = 0
+    st.session_state.game_over = False
+    st.session_state.dino_y = 0
+    st.session_state.is_jumping = False
+    st.session_state.is_flying = False
+    st.session_state.obstacle_count = 0
+    st.session_state.map_state = "DESERT"
+    st.session_state.obstacle_x = 100
+    st.session_state.current_obstacle_type = "CACTUS"
+
+# Vòng lặp cập nhật chuyển động logic (Game Loop Tích Hợp)
+if not st.session_state.game_over:
+    # 1. Di chuyển chướng ngại vật từ phải sang trái
+    st.session_state.obstacle_x -= 8
+    
+    # Xử lý hiệu ứng rơi sau khi nhảy
+    if st.session_state.is_jumping:
+        st.session_state.dino_y -= 15
+        if st.session_state.dino_y <= 0:
+            st.session_state.dino_y = 0
+            st.session_state.is_jumping = False
+
+    # Xử lý tính năng BAY 3 GIÂY của Cây thứ 6
+    if st.session_state.is_flying:
+        st.session_state.dino_y = 120 # Giữ khủng long trên trời cao hẳn
+        if time.time() - st.session_state.fly_start_time > 3.0:
+            st.session_state.is_flying = False
+            st.session_state.dino_y = 0 # Đáp xuống vị trí trống an toàn
+
+    # 2. Định nghĩa thể loại chướng ngại vật dựa trên số lượng đếm được
+    count = st.session_state.obstacle_count
+    if st.session_state.map_state == "DESERT":
+        if count == 5:
+            st.session_state.current_obstacle_type = "JETPACK_CACTUS"
+        elif count == 11:
+            st.session_state.current_obstacle_type = "PORTAL"
+        else:
+            st.session_state.current_obstacle_type = "CACTUS"
+    else:
+        st.session_state.current_obstacle_type = "ROCK"
+
+    # 3. Khi chướng ngại vật chạy hết màn hình bên trái -> Vượt qua thành công
+    if st.session_state.obstacle_x < 0:
+        st.session_state.obstacle_x = 100
+        st.session_state.obstacle_count += 1
+        st.session_state.score += 10
+        
+        # Nếu vừa đi qua cổng dịch chuyển -> Đổi bản đồ sang Ngoài Đường
+        if st.session_state.current_obstacle_type == "PORTAL":
+            st.session_state.map_state = "ROAD"
+
+    # 4. Kiểm tra va chạm (Collision Detection) khi vật thể đến gần Khủng long (khoảng x từ 10% đến 22%)
+    if 10 <= st.session_state.obstacle_x <= 22:
+        # Nếu va chạm vào cây số 6 mang Jetpack -> Kích hoạt bay lên trời
+        if st.session_state.current_obstacle_type == "JETPACK_CACTUS":
+            if not st.session_state.is_flying:
+                st.session_state.is_flying = True
+                st.session_state.fly_start_time = time.time()
+        # Đối với các chướng ngại vật nguy hiểm thông thường (Cactus hoặc Rock)
+        elif st.session_state.current_obstacle_type in ["CACTUS", "ROCK"]:
+            if st.session_state.dino_y < 40: # Khủng long nhảy không đủ cao
+                st.session_state.game_over = True
+
+# --- THIẾT KẾ ĐỒ HỌA RENDER RA MÀN HÌNH ---
+container_class = "game-container road-theme" if st.session_state.map_state == "ROAD" else "game-container"
+dino_jetpack_effect = "jetpack" if st.session_state.is_flying else ""
+obs_type = st.session_state.current_obstacle_type.lower().replace("_", "-")
+
+game_html = f"""
+<div class="{container_class}">
+    <!-- Chú Khủng long Google -->
+    <div class="dino {dino_jetpack_effect}" style="bottom: {st.session_state.dino_y}px;"></div>
+    <!-- Chướng ngại vật chuyển động -->
+    <div class="{obs_type}" style="left: {st.session_state.obstacle_x}%;"></div>
+</div>
+"""
+st.markdown(game_html, unsafe_allow_html=True)
+
+# Bảng trạng thái thông tin game
+col_info1, col_info2, col_info3 = st.columns(3)
+with col_info1:
+    st.metric("🏆 Điểm số", f"{st.session_state.score}")
+with col_info2:
+    st.metric("🗺️ Bản đồ hiện tại", "Bên Ngoài Đường 🛣️" if st.session_state.map_state == "ROAD" else "Sa mạc Xương rồng 🏜️")
+with col_info3:
+    st.metric("🚩 Chướng ngại vật", f"{st.session_state.obstacle_count} / Đang đợi...")
+
+# Giao diện các nút tương tác điều khiển hành động
+st.write("")
+if st.session_state.game_over:
+    st.error("💥 GAME OVER! Chú khủng long đã va chạm chướng ngại vật.")
+    st.button("🔄 Chơi lại từ đầu", on_click=reset_game, type="primary", use_container_width=True)
+else:
+    if st.session_state.is_flying:
+        st.warning("🚀 ĐANG BAY BẰNG JETPACK TRÊN TRỜI CAO TRONG 3 GIÂY! HÃY ĐỢI ĐÁP XUỐNG...")
+    st.button("🦘 NHẢY LÊN", on_click=trigger_jump, type="primary", use_container_width=True)
+
+# Cơ chế tự động làm mới khung hình để tạo chuyển động mượt mà liên tục
+if not st.session_state.game_over:
+    time.sleep(0.08)
+    st.rerun()
